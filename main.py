@@ -1,4 +1,10 @@
 from __future__ import print_function
+
+import os
+from utils import get_random_with_gpu_with_gb_free
+
+gpu = get_random_with_gpu_with_gb_free(20)
+os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu)
 import argparse
 import torch
 import torch.nn as nn
