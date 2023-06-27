@@ -70,6 +70,12 @@ def test(model, device, test_loader):
         100. * correct / len(test_loader.dataset)))
 
 
+def assert_dataset_location(dataset1):
+    import os
+    print(os.path.abspath(dataset1.root))
+    assert 'home/lab' not in os.path.abspath(dataset1.root)
+
+
 def main():
     # Training settings
     parser = argparse.ArgumentParser(description='PyTorch MNIST Example')
@@ -123,6 +129,7 @@ def main():
     ])
     dataset1 = datasets.MNIST('../data', train=True, download=True,
                               transform=transform)
+    assert_dataset_location(dataset1)
     dataset2 = datasets.MNIST('../data', train=False,
                               transform=transform)
     train_loader = torch.utils.data.DataLoader(dataset1, **train_kwargs)
