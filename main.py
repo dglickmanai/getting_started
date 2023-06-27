@@ -6,6 +6,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torchvision import datasets, transforms
 from torch.optim.lr_scheduler import StepLR
+import wandb
 
 
 class Net(nn.Module):
@@ -49,6 +50,7 @@ def train(args, model, device, train_loader, optimizer, epoch):
                        100. * batch_idx / len(train_loader), loss.item()))
             if args.dry_run:
                 break
+        wandb.log({"train_loss": loss.item()})
 
 
 def test(model, device, test_loader):
@@ -65,9 +67,12 @@ def test(model, device, test_loader):
 
     test_loss /= len(test_loader.dataset)
 
+    acc = 100. * correct / len(test_loader.dataset)
+    wandb.log({"test_acc": acc})
+
     print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
         test_loss, correct, len(test_loader.dataset),
-        100. * correct / len(test_loader.dataset)))
+        acc))
 
 
 def assert_dataset_location(dataset1):
@@ -122,6 +127,13 @@ def main():
                        'shuffle': True}
         train_kwargs.update(cuda_kwargs)
         test_kwargs.update(cuda_kwargs)
+
+    wandb.init(
+        # Set the project where this run will be logged
+        project="getting_started",
+        # Track hyperparameters and run metadata
+        config=args
+    )
 
     transform = transforms.Compose([
         transforms.ToTensor(),
