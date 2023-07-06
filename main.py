@@ -113,6 +113,8 @@ def main():
     parser.add_argument('--save-model', action='store_true', default=False,
                         help='For Saving the current Model')
     args = parser.parse_args()
+    wandb.init(config=args)
+    args = wandb.config
     use_cuda = not args.no_cuda and torch.cuda.is_available()
     use_mps = not args.no_mps and torch.backends.mps.is_available()
 
@@ -134,13 +136,6 @@ def main():
         train_kwargs.update(cuda_kwargs)
         test_kwargs.update(cuda_kwargs)
 
-    wandb.init(
-        # Set the project where this run will be logged
-        project="getting_started",
-        # Track hyperparameters and run metadata
-        config=args
-    )
-
     transform = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize((0.1307,), (0.3081,))
@@ -159,12 +154,28 @@ def main():
     scheduler = StepLR(optimizer, step_size=1, gamma=args.gamma)
     for epoch in range(1, args.epochs + 1):
         train(args, model, device, train_loader, optimizer, epoch)
-        test(model, device, test_loader)
-        scheduler.step()
+    test(model, device, test_loader)
+    scheduler.step()
 
     if args.save_model:
         torch.save(model.state_dict(), "mnist_cnn.pt")
 
 
-if __name__ == '__main__':
-    main()
+sweep_configuration = {
+    'method': 'random',
+    'name': 'sweep',
+    'metric': {'goal': 'maximize', 'name': 'test_acc'},
+    'parameters':
+        {
+            'batch_size': {'values': [16, 32, 64]},
+            'epochs': {'values': [5, 10, 15]},
+            'lr': {'max': 0.1, 'min': 0.0001}
+        }
+}
+
+sweep_id = wandb.sweep(
+    sweep=sweep_configuration,
+    project='my-first-sweep'
+)
+
+wandb.agent(sweep_id, function=main, count=4)
