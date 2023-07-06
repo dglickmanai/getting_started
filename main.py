@@ -1,10 +1,4 @@
 from __future__ import print_function
-
-import os
-from utils import get_random_with_gpu_with_gb_free
-
-gpu = get_random_with_gpu_with_gb_free(20)
-os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu)
 import argparse
 import torch
 import torch.nn as nn
@@ -12,7 +6,6 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torchvision import datasets, transforms
 from torch.optim.lr_scheduler import StepLR
-import wandb
 
 
 class Net(nn.Module):
@@ -56,7 +49,6 @@ def train(args, model, device, train_loader, optimizer, epoch):
                        100. * batch_idx / len(train_loader), loss.item()))
             if args.dry_run:
                 break
-        wandb.log({"train_loss": loss.item()})
 
 
 def test(model, device, test_loader):
@@ -73,12 +65,9 @@ def test(model, device, test_loader):
 
     test_loss /= len(test_loader.dataset)
 
-    acc = 100. * correct / len(test_loader.dataset)
-    wandb.log({"test_acc": acc})
-
     print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
         test_loss, correct, len(test_loader.dataset),
-        acc))
+        100. * correct / len(test_loader.dataset)))
 
 
 def assert_dataset_location(dataset1):
@@ -113,8 +102,6 @@ def main():
     parser.add_argument('--save-model', action='store_true', default=False,
                         help='For Saving the current Model')
     args = parser.parse_args()
-    wandb.init(config=args)
-    args = wandb.config
     use_cuda = not args.no_cuda and torch.cuda.is_available()
     use_mps = not args.no_mps and torch.backends.mps.is_available()
 
@@ -140,10 +127,10 @@ def main():
         transforms.ToTensor(),
         transforms.Normalize((0.1307,), (0.3081,))
     ])
-    dataset1 = datasets.MNIST('/cortex/users/danielg/data', train=True, download=True,
+    dataset1 = datasets.MNIST('../data', train=True, download=True,
                               transform=transform)
     assert_dataset_location(dataset1)
-    dataset2 = datasets.MNIST('/cortex/users/danielg/data', train=False,
+    dataset2 = datasets.MNIST('../data', train=False,
                               transform=transform)
     train_loader = torch.utils.data.DataLoader(dataset1, **train_kwargs)
     test_loader = torch.utils.data.DataLoader(dataset2, **test_kwargs)
@@ -154,28 +141,12 @@ def main():
     scheduler = StepLR(optimizer, step_size=1, gamma=args.gamma)
     for epoch in range(1, args.epochs + 1):
         train(args, model, device, train_loader, optimizer, epoch)
-    test(model, device, test_loader)
-    scheduler.step()
+        test(model, device, test_loader)
+        scheduler.step()
 
     if args.save_model:
         torch.save(model.state_dict(), "mnist_cnn.pt")
 
 
-sweep_configuration = {
-    'method': 'random',
-    'name': 'sweep',
-    'metric': {'goal': 'maximize', 'name': 'test_acc'},
-    'parameters':
-        {
-            'batch_size': {'values': [16, 32, 64]},
-            'epochs': {'values': [5, 10, 15]},
-            'lr': {'max': 0.1, 'min': 0.0001}
-        }
-}
-
-sweep_id = wandb.sweep(
-    sweep=sweep_configuration,
-    project='my-first-sweep'
-)
-
-wandb.agent(sweep_id, function=main, count=4)
+if __name__ == '__main__':
+    main()
